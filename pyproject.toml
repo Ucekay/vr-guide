@@ -1,0 +1,40 @@
+[project]
+name = "vr-guide"
+version = "0.1.0"
+description = "Instance-level movie-poster identification from VR screenshots, for a VR museum guide agent"
+readme = "README.md"
+authors = [
+    { name = "kimura", email = "kimura.yusuke@ist.osaka-u.ac.jp" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.9",
+    "torchvision>=0.24",
+    "opencv-python>=4.10",
+    "numpy>=1.26",
+    "kornia>=0.7",
+    "tqdm>=4.66",
+    "lightglue",
+]
+
+[project.scripts]
+build-db = "vr_guide.build_db:main"
+match = "vr_guide.match_fast:main"
+score = "vr_guide.score:main"
+
+[build-system]
+requires = ["uv_build>=0.11.20,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+# extractors only (SuperPoint/ALIKED/DISK/SIFT); pinned to the revision this
+# pipeline was developed against
+lightglue = { git = "https://github.com/cvg/LightGlue", rev = "eb42fee2d71449efb0aa5c10549752b5d75384d8" }
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+
+# GB10 (sm_121) needs CUDA 13 wheels; PyPI aarch64 wheels do not cover it
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

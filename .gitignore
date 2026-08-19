@@ -1,0 +1,10 @@
+# data & artefacts (hundreds of MB, tracked outside git)
+/data/
+/db/
+/out/
+/poster_matching.zip
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
