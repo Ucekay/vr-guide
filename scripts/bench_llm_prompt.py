@@ -41,8 +41,8 @@ def build_system_prompt(include_zh_title: bool = True, movie: str | None = None)
     built-in sample; the default stays the sample so runs remain comparable with
     earlier rows in out/llm_bench.csv."""
     if movie:
-        from vr_guide.content_db import load_exhibit_markdown
-        rdb_markdown = load_exhibit_markdown(movie, include_zh_title=include_zh_title)
+        from vr_guide.content_db import load_exhibit_markdown, split_poster_ids
+        rdb_markdown = load_exhibit_markdown(split_poster_ids([movie]), include_zh_title=include_zh_title)
         return (
             '你是VRChat电影史博物馆的AI导览员。访客现在正站在一幅电影海报前,'
             '你的任务是根据下面提供的"展板内容",用口语回答访客的问题。\n\n'
@@ -150,7 +150,7 @@ def main():
     ap.add_argument("--tag", default="", help="label for this run, stored in the CSV (e.g. 'mtp', 'no-mtp')")
     ap.add_argument("--out-csv", default="out/llm_bench.csv")
     ap.add_argument("--no-zh-title", action="store_true", help="drop movie_title_zh from the heading (test redundancy with essay_md)")
-    ap.add_argument("--movie", default=None, help="Poster ID (movie_slug or id): load exhibit content from Postgres instead of the built-in sample")
+    ap.add_argument("--movie", default=None, help="Poster ID(s) (movie_slug or id, comma-separated for several): load exhibit content from Postgres instead of the built-in sample")
     args = ap.parse_args()
 
     system_prompt = build_system_prompt(include_zh_title=not args.no_zh_title, movie=args.movie)

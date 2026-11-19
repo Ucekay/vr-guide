@@ -6,6 +6,7 @@ Schema and rationale: CONTEXT.md, docs/adr/0001-postgres-server-content-store.md
   uv run sync-content --dry-run       # parse only, print what would be synced
   uv run get-movie the-godfather      # fetch one movie (by movie_slug or id)
   uv run get-movie the-godfather --exhibit   # ...rendered as the LLM's exhibit content
+  uv run get-movie jaws star-wars --exhibit  # several Poster IDs from one recognition
 
 Connection: $DATABASE_URL (default: the docker compose service in compose.yaml).
 """
@@ -147,6 +148,24 @@ def get_movie(conn, key: str | int) -> dict | None:
     ).fetchone()
 
 
+def get_movies(conn, keys: list[str | int]) -> tuple[list[dict], list[str | int]]:
+    """Several Poster IDs (one recognition can return more than one) -> rows.
+
+    Keeps the recognition's order, drops duplicates (same movie by slug and by
+    id counts once). Returns (rows, missing_keys)."""
+    rows: list[dict] = []
+    missing: list[str | int] = []
+    seen: set[int] = set()
+    for key in keys:
+        row = get_movie(conn, key)
+        if row is None:
+            missing.append(key)
+        elif row["id"] not in seen:
+            seen.add(row["id"])
+            rows.append(row)
+    return rows, missing
+
+
 def render_exhibit_markdown(row: dict, include_zh_title: bool = False) -> str:
     """get_movie() row -> the "exhibit content" block given to the LLM.
 
@@ -164,13 +183,34 @@ def render_exhibit_markdown(row: dict, include_zh_title: bool = False) -> str:
     return f"{chapter}\n\n{heading}\n\n{row['essay_md']}"
 
 
-def load_exhibit_markdown(key: str | int, include_zh_title: bool = False, dsn: str | None = None) -> str:
-    """Poster ID -> exhibit content for the LLM, straight from Postgres."""
+def render_exhibits_markdown(rows: list[dict], include_zh_title: bool = False) -> str:
+    """Several movies in view -> one exhibit-content block.
+
+    One movie renders exactly like render_exhibit_markdown(). For several, each
+    movie keeps its own "# 章节" + "## title" block so the LLM can tell which
+    essay belongs to which poster."""
+    return "\n\n".join(render_exhibit_markdown(r, include_zh_title) for r in rows)
+
+
+def load_exhibit_markdown(keys: str | int | list[str | int], include_zh_title: bool = False,
+                          dsn: str | None = None) -> str:
+    """Poster ID(s) from one recognition -> exhibit content for the LLM, from Postgres.
+
+    IDs not found in the DB are skipped with a warning (the visitor still gets
+    an answer about the posters we do know); if none are found, KeyError."""
+    keys = [keys] if isinstance(keys, (str, int)) else list(keys)
     with connect(dsn) as conn:
-        row = get_movie(conn, key)
-    if row is None:
-        raise KeyError(f"no movie for Poster ID {key!r}")
-    return render_exhibit_markdown(row, include_zh_title)
+        rows, missing = get_movies(conn, keys)
+    if missing:
+        print(f"warning: no movie for Poster ID(s) {missing!r}; skipped", file=sys.stderr)
+    if not rows:
+        raise KeyError(f"no movie for any Poster ID in {keys!r}")
+    return render_exhibits_markdown(rows, include_zh_title)
+
+
+def split_poster_ids(values: list[str] | None) -> list[str]:
+    """CLI helper: ["a,b", "c"] -> ["a", "b", "c"] (repeatable and/or comma-separated)."""
+    return [k.strip() for v in values or [] for k in v.split(",") if k.strip()]
 
 
 def main() -> None:
@@ -192,19 +232,21 @@ def main() -> None:
 
 
 def main_get() -> None:
-    ap = argparse.ArgumentParser(description="Fetch one movie by Poster ID (movie_slug or id)")
-    ap.add_argument("key")
+    ap = argparse.ArgumentParser(description="Fetch movies by Poster ID(s) (movie_slug or id)")
+    ap.add_argument("keys", nargs="+", help="one or more Poster IDs (one recognition may return several)")
     ap.add_argument("--dsn", default=None)
     ap.add_argument("--exhibit", action="store_true", help="print the LLM exhibit-content Markdown instead of JSON")
     args = ap.parse_args()
     with connect(args.dsn) as conn:
-        row = get_movie(conn, args.key)
-    if row is None:
-        raise SystemExit(f"not found: {args.key}")
+        rows, missing = get_movies(conn, args.keys)
+    if missing:
+        print(f"not found: {missing}", file=sys.stderr)
+    if not rows:
+        raise SystemExit(1)
     if args.exhibit:
-        print(render_exhibit_markdown(row))
+        print(render_exhibits_markdown(rows))
         return
-    print(json.dumps(row, ensure_ascii=False, indent=2))
+    print(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

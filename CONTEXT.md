@@ -34,7 +34,7 @@ _Avoid_: section, category
 - **idを受け取った後の取得フロー**: 受け取った id（＝`movie_id`/`movie_slug`）で `movies` を1行取得し `chapters` をJOIN（1クエリ）→ `chapter.title_zh` / `movie.title_zh` / `movie.title_orig` / `movie.year` / `movie.essay_md` をMarkdownテンプレートに組み立ててAIエージェント（LLM）のコンテキストとして渡す。
 - **エージェント応答方式**: 固定文の読み上げではなく、上記Markdownをコンテキストとして渡し、来場者の自由質問にLLMが答える方式（自由対話型）。
 - **エージェント応答範囲**: 1回の会話は「今認識している Poster ID が属する Movie」の情報に閉じる。他の Movie を横断した質問には（今回のスコープでは）対応しない。
-- **複数ポスター同時検出**: 実運用上は基本的に1スクリーンショットにつき Poster ID は1つしか返らない想定。
+- **複数ポスター同時検出**: 1回の認識で Poster ID が複数返ることがある。その場合は返った全 Movie の解説を、映画ごとに見出しを分けて1つの展示内容としてLLMに渡す（`load_exhibit_markdown([...])`）。どの映画の質問か判別できなければLLMが一言確認する（固定ルールとしてプロンプトに入れ、prefix cache を崩さない）。DBに無い Poster ID は警告を出して読み飛ばす。会話履歴を「Poster ID の集合」が変わったときにリセットするか等、複数時の履歴方針は未決。
 - **実行形態**: 常時稼働のサーバー1つに複数来場者からのリクエストが集まるサーバー集中型。DBもサーバー側で共有（Postgres）。詳細は [[0001-postgres-server-content-store]] 参照。
 - **多言語対応**: 現状は中国語決め打ち。多言語化は将来の別ADRとして先送り（YAGNI）。
 

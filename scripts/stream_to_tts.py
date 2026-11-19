@@ -58,6 +58,7 @@ def system_prompt_zh(rdb_markdown: str) -> str:
    - 不要重复访客的问题,直接说答案。
 5. 不管访客用什么语言提问,你的回答都必须翻译成和访客提问完全相同的语言。
 6. 直接输出给访客听的回答原文,不要输出任何JSON、标签或其他包装。
+7. 访客视野里有时会同时出现多幅海报,这时展板内容会包含多部电影。如果访客的问题没有说明是哪一部、也无法从上下文判断,先用一句话简短确认访客问的是哪一部。
 
 【展板内容】
 {rdb_markdown}
@@ -78,6 +79,7 @@ def system_prompt_en(rdb_markdown: str) -> str:
    - Don't repeat the visitor's question — answer directly.
 5. No matter what language the visitor asks in, your answer must be translated into that exact same language.
 6. Output only the spoken answer text itself — no JSON, no tags, no other wrapper.
+7. Several posters can be in the visitor's view at once; then the exhibit content covers more than one movie. If the question doesn't say which movie it's about and the context doesn't make it clear, first ask in one short sentence which one they mean.
 
 [EXHIBIT CONTENT]
 {rdb_markdown}
@@ -215,23 +217,24 @@ def main():
     ap.add_argument("--base-url", default="http://localhost:8000/v1")
     ap.add_argument("--model", default="unsloth/gemma-4-12b-it-NVFP4")
     ap.add_argument("--lang", choices=["zh", "en"], default="en", help="system prompt (rules) language; exhibit content stays Chinese either way")
-    ap.add_argument("--movie", default=None,
-                    help="Poster ID (movie_slug or id): load exhibit content from Postgres "
+    ap.add_argument("--movie", action="append", default=None,
+                    help="Poster ID (movie_slug or id): load exhibit content from Postgres. "
+                         "Repeat or comma-separate when one recognition returns several "
                          "(run via `uv run python scripts/stream_to_tts.py`). "
                          "Default: the built-in L'Arrivée d'un train sample")
     ap.add_argument("--print-prompt", action="store_true", help="print the system prompt and exit")
     args = ap.parse_args()
 
     if args.movie:
-        from vr_guide.content_db import load_exhibit_markdown
-        rdb_markdown = load_exhibit_markdown(args.movie)
+        from vr_guide.content_db import load_exhibit_markdown, split_poster_ids
+        rdb_markdown = load_exhibit_markdown(split_poster_ids(args.movie))
     else:
         rdb_markdown = RDB_MARKDOWN
     system_prompt = (system_prompt_en if args.lang == "en" else system_prompt_zh)(rdb_markdown)
     if args.print_prompt:
         print(system_prompt)
         return
-    print(f"質問: {args.question}  [prompt_lang={args.lang}, movie={args.movie or 'builtin-sample'}]\n")
+    print(f"質問: {args.question}  [prompt_lang={args.lang}, movie={','.join(args.movie) if args.movie else 'builtin-sample'}]\n")
     r = stream_answer(args.base_url, args.model, args.question, system_prompt)
     print(f"\n完全な回答: {r['answer']!r}")
     print(f"チャンク数: {r['chunk_count']}")
