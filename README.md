@@ -45,6 +45,20 @@ uv run score --results out/repro.csv --labels data/labels_era1.csv --lang en
 uv run build-db --ref-dir data/refs --out db/fast.pt --scales 1024 700 480 320 220
 ```
 
+## 映画解説DB（Postgres）
+
+`film-impression-museum-exhibition-plan.md` を正本として、Postgres の `chapters` / `movies` に同期する
+（設計: `CONTEXT.md`, `docs/adr/0001-postgres-server-content-store.md`）。
+
+```bash
+docker compose up -d --wait          # Postgres 17 (127.0.0.1:5432, vrguide/vrguide)
+uv run sync-content --dry-run        # パース結果の確認のみ
+uv run sync-content                  # Markdown -> Postgres（movie_slug で upsert、消えた映画は削除）
+uv run get-movie the-godfather       # Poster ID（movie_slug または id）で1件取得
+```
+
+接続先は `$DATABASE_URL`（既定 `postgresql://vrguide:vrguide@localhost:5432/vrguide`）。
+
 ## ベースライン実測値 (2026-08-19, NVIDIA GB10 / CUDA 13.0 / torch 2.13.0+cu130)
 
 era1 テストセット 39枚:

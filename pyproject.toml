@@ -15,12 +15,15 @@ dependencies = [
     "kornia>=0.7",
     "tqdm>=4.66",
     "lightglue",
+    "psycopg[binary]>=3.2",
 ]
 
 [project.scripts]
 build-db = "vr_guide.build_db:main"
 match = "vr_guide.match_fast:main"
 score = "vr_guide.score:main"
+sync-content = "vr_guide.content_db:main"
+get-movie = "vr_guide.content_db:main_get"
 
 [build-system]
 requires = ["uv_build>=0.11.20,<0.12.0"]
