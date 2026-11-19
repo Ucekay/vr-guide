@@ -1,0 +1,20 @@
+# Content store (Postgres) for movie essays. See docs/adr/0001-postgres-server-content-store.md
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: vrguide
+      POSTGRES_PASSWORD: vrguide
+      POSTGRES_DB: vrguide
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vrguide -d vrguide"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:
